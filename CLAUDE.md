@@ -56,22 +56,22 @@ Working and verified on macOS: static colour, picker, replug/wake recovery, auto
 screen sync with monitor choice, ScreenCaptureKit capture (~1% CPU on a still screen),
 colour presets. Release binary ~3.8 MB.
 
-**Never compiled yet:** Windows and Linux. They use `xcap` screenshots for capture (no native
-low-cost capture yet).
+**Windows and Linux** build and pass tests in CI (`.github/workflows/build.yml`), but have not
+been run on real hardware yet. They use `xcap` screenshots for capture (no native low-cost
+capture yet). Linux needs `libpipewire-0.3-dev`, `libgbm-dev` and friends; the full apt list
+is in the workflow and README.
 
-## Open tasks (polish for public release on GitHub)
+## Releasing
 
-1. Get Windows and Linux building in CI (`.github/workflows/build.yml`). The Linux job is
-   missing packages needed by `xcap`: `clang libxcb1-dev libxrandr-dev libdbus-1-dev
-   libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev`. Remove the leftover
-   "Move this file…" comment at the top of the workflow.
-2. Release workflow: on a `v*` tag, build all three OSes and attach binaries (plus the udev
-   rule) to a GitHub release.
-3. Rewrite README.md for first-time visitors: features, downloads, per-OS permissions
-   (macOS Screen Recording + Gatekeeper for unsigned binaries, Linux udev rule + AppIndicator),
-   build instructions, colour presets, layout config, credits to related projects:
-   OpenRGB (Robobloq controller), OpenLamp (danodoms/openlamp-robobloq-macos), AmbiEdge (KorbSoft/AmbiEdge).
-4. Cargo.toml metadata (`repository`, `homepage`, `keywords`, `categories`).
+Bump `version` in `Cargo.toml`, then push a tag `vX.Y.Z`. `.github/workflows/release.yml`
+builds all three OSes and publishes a GitHub release with per-OS archives (binary, README,
+LICENSE; Linux also the udev rule), the standalone udev rule and `SHA256SUMS.txt`.
+The release workflow has not been run yet.
+
+## Open tasks
+
+1. Test the Windows and Linux binaries on real hardware (tray, picker, udev rule, screen sync).
+2. Cut the first release (`v0.2.0`) and check the release assets.
 
 ## Deferred / parked
 
