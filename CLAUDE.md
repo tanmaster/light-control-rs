@@ -63,7 +63,7 @@ low-cost capture yet).
 
 1. Get Windows and Linux building in CI (`.github/workflows/build.yml`). The Linux job is
    missing packages needed by `xcap`: `clang libxcb1-dev libxrandr-dev libdbus-1-dev
-   libpipewire-0.3-dev libwayland-dev libegl-dev`. Remove the leftover
+   libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev`. Remove the leftover
    "Move this file…" comment at the top of the workflow.
 2. Release workflow: on a `v*` tag, build all three OSes and attach binaries (plus the udev
    rule) to a GitHub release.

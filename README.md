@@ -152,7 +152,7 @@ cargo build --release
   ```sh
   sudo apt install build-essential pkg-config clang libgtk-3-dev libxdo-dev \
     libayatana-appindicator3-dev libudev-dev libxkbcommon-dev \
-    libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev
+    libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev
   ```
 
 While running from a terminal, the app prints connection errors and, during screen sync,
