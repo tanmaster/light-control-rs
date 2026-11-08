@@ -46,7 +46,7 @@ Quit any running instance before `--test-layout`, or it overwrites the pattern w
   `Library not loaded: @rpath/libswift_Concurrency.dylib`. A dependency's
   `cargo:rustc-link-arg` does not reach our binary, so these must stay in our `build.rs`.
 - **Linux runtime libraries:** the binary must only link libraries a stock Ubuntu desktop ships
-  (CI checks this with `readelf`). `tray-icon` is built without its default `libxdo` feature
+  (CI checks this with `readelf`; libpipewire is allowed, Ubuntu desktop ships it). `tray-icon` is built without its default `libxdo` feature
   for this reason (v0.2.0 failed to start with `libxdo.so.3: cannot open shared object file`).
 - **udev rule number:** `TAG+="uaccess"` only works in a rule file numbered below 73
   (systemd applies it in `73-seat-late.rules`), hence `70-light-control.rules`.
