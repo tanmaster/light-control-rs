@@ -89,12 +89,80 @@ pub fn static_color(seq: u8, rgb: [u8; 3], led_count: u8) -> Vec<u8> {
     rb_packet(seq, action::SET_SECTION_LED, &payload)
 }
 
+/// A range of LEDs (1-based, inclusive) set to one colour: `(first, rgb, last)`.
+pub type Group = (u8, [u8; 3], u8);
+
+fn flatten(groups: &[Group]) -> Vec<u8> {
+    groups
+        .iter()
+        .flat_map(|&(first, [r, g, b], last)| [first, r, g, b, last])
+        .collect()
+}
+
+/// `setSectionLED` with arbitrary groups (must fit in one 64-byte report, i.e. ≤ 11 groups).
+pub fn section_led(seq: u8, groups: &[Group]) -> Vec<u8> {
+    rb_packet(seq, action::SET_SECTION_LED, &flatten(groups))
+}
+
+/// Most groups the official app ever puts in one screen-sync frame.
+pub const MAX_SYNC_GROUPS: usize = 50;
+
+/// Screen-sync frame:
+///
+/// ```text
+/// 'S' 'C' <u16 BE len> <seq> 0x80 <groups ...> <checksum>
+/// ```
+///
+/// Usually longer than one report; send it with [`to_reports`].
+pub fn sync_frame(seq: u8, groups: &[Group]) -> Vec<u8> {
+    let len = 7 + 5 * groups.len();
+    let mut p = Vec::with_capacity(len);
+    p.extend_from_slice(b"SC");
+    p.extend_from_slice(&(len as u16).to_be_bytes());
+    p.push(seq);
+    p.push(action::SET_SYNC_SCREEN);
+    p.extend_from_slice(&flatten(groups));
+    p.push(checksum(&p));
+    p
+}
+
+/// Turn one colour per LED into at most `max` contiguous groups,
+/// averaging the LEDs that share a group.
+pub fn merge_groups(colors: &[[u8; 3]], max: usize) -> Vec<Group> {
+    let n = colors.len().min(MAX_LED as usize);
+    if n == 0 || max == 0 {
+        return Vec::new();
+    }
+    let count = n.min(max);
+    (0..count)
+        .map(|j| {
+            let start = j * n / count;
+            let end = (j + 1) * n / count;
+            let slice = &colors[start..end];
+            let mut sum = [0u32; 3];
+            for c in slice {
+                for k in 0..3 {
+                    sum[k] += u32::from(c[k]);
+                }
+            }
+            let len = slice.len() as u32;
+            let avg = sum.map(|s| ((s + len / 2) / len) as u8);
+            ((start + 1) as u8, avg, end as u8)
+        })
+        .collect()
+}
+
 /// Wrap a packet into a HID output report: report id 0 followed by 64 bytes.
 pub fn to_report(packet: &[u8]) -> [u8; REPORT_LEN + 1] {
     assert!(packet.len() <= REPORT_LEN);
     let mut report = [0u8; REPORT_LEN + 1];
     report[1..=packet.len()].copy_from_slice(packet);
     report
+}
+
+/// Split a packet of any length into consecutive reports, like the official app does.
+pub fn to_reports(packet: &[u8]) -> Vec<[u8; REPORT_LEN + 1]> {
+    packet.chunks(REPORT_LEN).map(to_report).collect()
 }
 
 #[cfg(test)]
@@ -153,6 +221,53 @@ mod tests {
         }
         assert_eq!(s.next(), 254);
         assert_eq!(s.next(), 1);
+    }
+
+    /// Screen-sync frame captured from the official app (fullscreen red image).
+    const SYNC_CAPTURE: &str = "534301013b8001ff00000102ff00000304ff00000405ff00000708ff00000809ff00000a0bff00000b0cff00000d0eff00000e0fff00001011ff00001112ff00001314ff00001415ff00001617ff00001819ff00001a1bff00001c1dff00001e1fff00002021ff00002122ff00002324ff00002425ff00002627ff00002728ff00002829ff00002a2bff00002b2cff00002d2eff00002e2fff00003132ff00003233ff00003435ff00003536ff00003637ff00003738ff00003839ff00003a3bff00003b3cff00003d3eff00003e3fff00004041ff00004243ff00004445ff00004647ff00004849ff00004a4bff00004b4cff00004d4eff00004e4fff000050e9";
+
+    #[test]
+    fn sync_frame_matches_capture() {
+        let captured = hex(SYNC_CAPTURE);
+        let groups: Vec<Group> = captured[6..captured.len() - 1]
+            .chunks(5)
+            .map(|g| (g[0], [g[1], g[2], g[3]], g[4]))
+            .collect();
+        assert_eq!(groups.len(), 50);
+        assert_eq!(sync_frame(0x3b, &groups), captured);
+    }
+
+    #[test]
+    fn sync_frame_splits_into_five_reports() {
+        let reports = to_reports(&hex(SYNC_CAPTURE));
+        assert_eq!(reports.len(), 5);
+        assert!(reports.iter().all(|r| r[0] == 0));
+        assert_eq!(&reports[0][1..3], b"SC");
+        assert_eq!(reports[4][1], 0xe9);
+    }
+
+    #[test]
+    fn merge_groups_covers_every_led_once() {
+        let colors: Vec<[u8; 3]> = (0..80).map(|i| [i as u8, 0, 0]).collect();
+        let groups = merge_groups(&colors, MAX_SYNC_GROUPS);
+        assert_eq!(groups.len(), 50);
+        assert_eq!(groups[0].0, 1);
+        assert_eq!(groups.last().unwrap().2, 80);
+        for w in groups.windows(2) {
+            assert_eq!(w[0].2 + 1, w[1].0);
+        }
+        // LEDs 2 and 3 (values 1 and 2) share a group and average to 2 (rounded).
+        assert_eq!(groups[1], (2, [2, 0, 0], 3));
+        // Fewer LEDs than the limit: one group per LED.
+        assert_eq!(merge_groups(&colors[..10], 50).len(), 10);
+    }
+
+    #[test]
+    fn section_led_layout_test_fits_one_report() {
+        let groups = [(1, [255, 255, 0], 3), (4, [255, 0, 0], 14), (15, [0, 255, 0], 40)];
+        let p = section_led(1, &groups);
+        assert_eq!(p.len(), 6 + 15);
+        assert_eq!(&p[5..10], &[1, 255, 255, 0, 3]);
     }
 
     #[test]

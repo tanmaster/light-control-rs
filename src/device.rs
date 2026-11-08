@@ -1,11 +1,13 @@
 //! Background thread that owns the HID device.
 //!
-//! It keeps the strip showing the wanted colour:
+//! Static mode keeps the strip showing the wanted colour:
 //! * re-opens and re-sends when the strip is plugged back in,
 //! * re-sends after the computer wakes up (detected by a jump in wall-clock time,
 //!   because the strip loses power and falls back to its rainbow mode),
 //! * re-sends every 30 s as a cheap liveness check, which also catches
 //!   re-enumerations that happen too fast to notice by polling.
+//!
+//! Sync mode streams frames from the screen-sync thread instead.
 
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::thread;
@@ -21,8 +23,10 @@ const POLL: Duration = Duration::from_secs(2);
 const REFRESH: Duration = Duration::from_secs(30);
 
 pub enum Command {
-    /// Show this (already brightness-scaled) colour. Black means off.
+    /// Show this (already brightness-scaled) colour. Black means off. Ends sync mode.
     Show([u8; 3]),
+    /// One screen-sync frame: a colour per LED, in LED order.
+    Frame(Vec<[u8; 3]>),
     /// Re-open the device and send the current colour again.
     Resend,
     Quit,
@@ -37,12 +41,15 @@ pub fn spawn(proxy: EventLoopProxy<UserEvent>, led_count: u8, initial: [u8; 3]) 
                 proxy,
                 led_count,
                 rgb: initial,
+                frame: None,
+                syncing: false,
                 seq: Sequence::default(),
                 api: None,
                 dev: None,
                 dirty: true,
                 connected: None,
                 last_sent: Instant::now(),
+                last_check: None,
             }
             .run(rx)
         })
@@ -50,22 +57,37 @@ pub fn spawn(proxy: EventLoopProxy<UserEvent>, led_count: u8, initial: [u8; 3]) 
     tx
 }
 
+/// Send a single packet to the strip, outside the tray app (used by `--test-layout`).
+pub fn send_once(packet: &[u8]) -> Result<(), String> {
+    let api = HidApi::new().map_err(|e| format!("hidapi init failed: {e}"))?;
+    let dev = api
+        .open(VENDOR_ID, PRODUCT_ID)
+        .map_err(|e| format!("could not open light strip: {e}"))?;
+    for report in protocol::to_reports(packet) {
+        dev.write(&report).map_err(|e| format!("write failed: {e}"))?;
+    }
+    Ok(())
+}
+
 struct Worker {
     proxy: EventLoopProxy<UserEvent>,
     led_count: u8,
     rgb: [u8; 3],
+    /// Latest screen-sync frame not yet sent.
+    frame: Option<Vec<[u8; 3]>>,
+    syncing: bool,
     seq: Sequence,
     api: Option<HidApi>,
     dev: Option<HidDevice>,
-    /// The colour still has to be (re)sent.
+    /// The static colour still has to be (re)sent.
     dirty: bool,
     connected: Option<bool>,
     last_sent: Instant,
+    last_check: Option<Instant>,
 }
 
 impl Worker {
     fn run(mut self, rx: Receiver<Command>) {
-        let mut tick = true;
         let mut force_open = true;
         let mut last_wall = SystemTime::now();
 
@@ -78,34 +100,42 @@ impl Worker {
             }
             last_wall = now;
 
-            if tick {
+            // Presence check every POLL, even while frames are streaming in.
+            if force_open || self.last_check.map_or(true, |t| t.elapsed() >= POLL) {
+                self.last_check = Some(Instant::now());
                 self.check_presence();
-            }
-            if self.dev.is_none() && (tick || force_open) {
-                self.open();
+                if self.dev.is_none() {
+                    self.open();
+                }
             }
             force_open = false;
-            if self.dev.is_some() && self.last_sent.elapsed() >= REFRESH {
-                self.dirty = true;
-            }
-            if self.dirty {
-                self.send();
+
+            if self.syncing {
+                if let Some(frame) = self.frame.take() {
+                    self.send_frame(&frame);
+                }
+            } else {
+                if self.dev.is_some() && self.last_sent.elapsed() >= REFRESH {
+                    self.dirty = true;
+                }
+                if self.dirty {
+                    self.send_static();
+                }
             }
 
-            tick = false;
             match rx.recv_timeout(POLL) {
                 Ok(cmd) => {
                     if !self.handle(cmd, &mut force_open) {
                         return;
                     }
-                    // Coalesce bursts (e.g. dragging in the colour picker): only the latest matters.
+                    // Coalesce bursts (picker dragging, sync frames): only the latest matters.
                     while let Ok(cmd) = rx.try_recv() {
                         if !self.handle(cmd, &mut force_open) {
                             return;
                         }
                     }
                 }
-                Err(RecvTimeoutError::Timeout) => tick = true,
+                Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => return,
             }
         }
@@ -116,7 +146,13 @@ impl Worker {
         match cmd {
             Command::Show(rgb) => {
                 self.rgb = rgb;
+                self.syncing = false;
+                self.frame = None;
                 self.dirty = true;
+            }
+            Command::Frame(colors) => {
+                self.syncing = true;
+                self.frame = Some(colors);
             }
             Command::Resend => {
                 self.dev = None;
@@ -171,25 +207,46 @@ impl Worker {
         }
     }
 
-    fn send(&mut self) {
+    fn send_static(&mut self) {
         if self.dev.is_none() {
             return;
         }
         let packet = protocol::static_color(self.seq.next(), self.rgb, self.led_count);
-        let report = protocol::to_report(&packet);
-        let result = self.dev.as_ref().map(|d| d.write(&report));
+        if self.write(&packet) {
+            self.dirty = false;
+            self.last_sent = Instant::now();
+        }
+    }
+
+    fn send_frame(&mut self, colors: &[[u8; 3]]) {
+        if self.dev.is_none() {
+            return;
+        }
+        let groups = protocol::merge_groups(colors, protocol::MAX_SYNC_GROUPS);
+        let packet = protocol::sync_frame(self.seq.next(), &groups);
+        self.write(&packet);
+    }
+
+    /// Write a packet as one or more reports. On failure the device is dropped
+    /// so the next presence check reconnects.
+    fn write(&mut self, packet: &[u8]) -> bool {
+        let Some(dev) = self.dev.as_ref() else { return false };
+        let result = protocol::to_reports(packet)
+            .iter()
+            .try_for_each(|report| dev.write(report).map(|_| ()));
         match result {
-            Some(Ok(_)) => {
-                self.dirty = false;
-                self.last_sent = Instant::now();
+            Ok(()) => {
                 self.set_connected(true);
+                true
             }
-            Some(Err(e)) => {
+            Err(e) => {
                 eprintln!("write failed, will reconnect: {e}");
                 self.dev = None;
+                // Make sure the static colour is restored after reconnecting.
+                self.dirty = true;
                 self.set_connected(false);
+                false
             }
-            None => {}
         }
     }
 

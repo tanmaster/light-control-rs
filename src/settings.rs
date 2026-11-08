@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
+use crate::layout::{default_layout, Segment};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -15,6 +17,12 @@ pub struct Settings {
     pub on: bool,
     /// Number of LEDs on the strip (80 for the 4-sided monitor kit).
     pub led_count: u8,
+    /// Whether screen sync was running (resumed on next start).
+    pub sync: bool,
+    /// Screen to mirror (as reported by the OS); `None` = main screen.
+    pub sync_screen: Option<String>,
+    /// Where the LEDs sit around the screen, in LED order (see `layout.rs`).
+    pub layout: Vec<Segment>,
 }
 
 impl Default for Settings {
@@ -24,6 +32,9 @@ impl Default for Settings {
             brightness: 100,
             on: true,
             led_count: 80,
+            sync: false,
+            sync_screen: None,
+            layout: default_layout(),
         }
     }
 }
