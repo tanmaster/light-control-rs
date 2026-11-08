@@ -76,7 +76,7 @@ colour presets. Release binary ~3.8 MB.
 
 **Windows and Linux** build and pass tests in CI (`.github/workflows/build.yml`).
 Windows: works on real hardware; screen sync uses `xcap` screenshots and is a bit laggy.
-Linux: tray, picker and udev rule work on Ubuntu. Wayland PipeWire capture is new and needs testing on
+Linux: tray, picker and udev rule work on Ubuntu. Wayland PipeWire capture tested on
 real hardware; X11 uses `xcap` screenshots. Linux needs `libpipewire-0.3-dev`, `libgbm-dev` and friends; the full apt list
 is in the workflow and README.
 
@@ -89,9 +89,9 @@ The release workflow has not been run yet.
 
 ## Open tasks
 
-1. Test Wayland screen sync (PipeWire) on Ubuntu: first-run dialog, no dialog on restart,
-   switching screens, declining, stopping sharing from the top bar.
-2. Release the udev rename and the PipeWire capture (v0.2.2).
+1. Wayland screen sync (PipeWire) works on Ubuntu; still untested: switching screens,
+   declining the dialog, stopping sharing from the top bar.
+2. Native capture on Windows (screen sync is laggier there).
 
 ## Deferred / parked
 
