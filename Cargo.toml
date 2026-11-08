@@ -5,6 +5,11 @@ edition = "2021"
 rust-version = "1.80"
 description = "Small open-source controller for the DX-Light / Robobloq USB monitor light strip"
 license = "GPL-3.0-only"
+repository = "https://github.com/tanmaster/light-control-rs"
+homepage = "https://github.com/tanmaster/light-control-rs"
+readme = "README.md"
+keywords = ["led", "ambilight", "backlight", "hid", "tray"]
+categories = ["hardware-support", "command-line-utilities", "multimedia"]
 
 [dependencies]
 hidapi = "2.6"
