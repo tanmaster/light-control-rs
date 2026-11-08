@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
+use crate::color::{self, Tuning};
 use crate::layout::{default_layout, Segment};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +22,9 @@ pub struct Settings {
     pub sync: bool,
     /// Screen to mirror (as reported by the OS); `None` = main screen.
     pub sync_screen: Option<String>,
+    /// Screen-sync colour enhancement (see `color.rs`): 1.0 = unchanged.
+    pub sync_saturation: f32,
+    pub sync_gamma: f32,
     /// Where the LEDs sit around the screen, in LED order (see `layout.rs`).
     pub layout: Vec<Segment>,
 }
@@ -34,6 +38,8 @@ impl Default for Settings {
             led_count: 80,
             sync: false,
             sync_screen: None,
+            sync_saturation: color::DEFAULT.saturation,
+            sync_gamma: color::DEFAULT.gamma,
             layout: default_layout(),
         }
     }
@@ -66,6 +72,13 @@ impl Settings {
             .and_then(|_| fs::write(&path, serde_json::to_string_pretty(self).unwrap_or_default()));
         if let Err(e) = result {
             eprintln!("could not save {}: {e}", path.display());
+        }
+    }
+
+    pub fn tuning(&self) -> Tuning {
+        Tuning {
+            saturation: self.sync_saturation.clamp(0.0, 4.0),
+            gamma: self.sync_gamma.clamp(0.2, 4.0),
         }
     }
 

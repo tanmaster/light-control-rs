@@ -13,6 +13,7 @@ use tray_icon::menu::{
 };
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
+use crate::color::{self, Tuning};
 use crate::device::{self, Command};
 use crate::settings::Settings;
 use crate::sync::{self, SyncHandle};
@@ -56,6 +57,7 @@ impl App {
                 self.settings.layout.clone(),
                 self.brightness.clone(),
                 self.settings.sync_screen.clone(),
+                self.settings.tuning(),
             ));
         }
     }
@@ -118,6 +120,16 @@ pub fn run() {
             screen_items.push((name, item));
         }
     }
+    // "Colours" submenu: screen-sync colour enhancement presets, used like radio buttons.
+    let colours_menu = Submenu::new("Colours", true);
+    let colour_items: Vec<(Tuning, CheckMenuItem)> = color::PRESETS
+        .iter()
+        .map(|&(label, tuning)| {
+            let item = CheckMenuItem::new(label, true, tuning == settings.tuning(), None);
+            let _ = colours_menu.append(&item);
+            (tuning, item)
+        })
+        .collect();
     let resend = MenuItem::new("Resend colour", true, None);
     let login = CheckMenuItem::new("Launch at login", true, autostart::is_enabled(), None);
     let quit = MenuItem::new("Quit", true, None);
@@ -130,6 +142,7 @@ pub fn run() {
         &on,
         &screen,
         &screen_menu,
+        &colours_menu,
         &resend,
         &PredefinedMenuItem::separator(),
         &login,
@@ -212,6 +225,15 @@ pub fn run() {
                         app.settings.save();
                         app.restart_sync();
                     }
+                } else if let Some(pos) = colour_items.iter().position(|(_, item)| &id == item.id()) {
+                    for (i, (_, item)) in colour_items.iter().enumerate() {
+                        item.set_checked(i == pos);
+                    }
+                    let tuning = colour_items[pos].0;
+                    app.settings.sync_saturation = tuning.saturation;
+                    app.settings.sync_gamma = tuning.gamma;
+                    app.settings.save();
+                    app.restart_sync();
                 } else if &id == resend.id() {
                     let _ = app.device.send(Command::Resend);
                 } else if &id == login.id() {

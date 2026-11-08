@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 use xcap::Monitor;
 
+use crate::color::{self, Tuning};
 use crate::device::Command;
 use crate::layout::{self, Segment};
 
@@ -132,13 +133,14 @@ pub fn start(
     layout: Vec<Segment>,
     brightness: Arc<AtomicU8>,
     screen: Option<String>,
+    tuning: Tuning,
 ) -> SyncHandle {
     let stop = Arc::new(AtomicBool::new(false));
     let thread = {
         let stop = stop.clone();
         thread::Builder::new()
             .name("screen-sync".into())
-            .spawn(move || run(&device, &layout, &brightness, screen.as_deref(), &stop))
+            .spawn(move || run(&device, &layout, &brightness, screen.as_deref(), tuning, &stop))
             .expect("failed to start screen sync thread")
     };
     SyncHandle { stop, thread: Some(thread) }
@@ -149,6 +151,7 @@ fn run(
     layout: &[Segment],
     brightness: &AtomicU8,
     screen: Option<&str>,
+    tuning: Tuning,
     stop: &AtomicBool,
 ) {
     let mut source: Option<Source> = None;
@@ -223,7 +226,7 @@ fn run(
                     for k in 0..3 {
                         s[k] += (f32::from(c[k]) - s[k]) * NEW_FRAME_WEIGHT;
                     }
-                    s.map(|v| (v * scale).round().clamp(0.0, 255.0) as u8)
+                    color::enhance(*s, tuning).map(|v| (v * scale).round().clamp(0.0, 255.0) as u8)
                 })
                 .collect();
 

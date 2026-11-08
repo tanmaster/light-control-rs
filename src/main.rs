@@ -4,6 +4,7 @@
 mod autostart;
 #[cfg(target_os = "macos")]
 mod capture_mac;
+mod color;
 mod device;
 mod layout;
 mod picker;
