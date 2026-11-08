@@ -17,6 +17,14 @@ cargo build --release
 ./target/release/light-control --test-layout   # lights fixed LED ranges to check the layout
 ```
 
+Linux check without a Linux machine (Docker / OrbStack; clippy, tests, build, runtime-library check):
+
+```sh
+tools/linux/check.sh
+```
+
+Run it before pushing Linux-specific changes instead of iterating on CI.
+
 Quit any running instance before `--test-layout`, or it overwrites the pattern within 30 s.
 
 ## Architecture (src/)
@@ -59,8 +67,6 @@ Quit any running instance before `--test-layout`, or it overwrites the pattern w
 - The strip ignores the checksum in practice, but we always send correct ones.
 - LED order (verified): LED 1 at the bottom of the left edge, clockwise: left 14, top 26,
   right 14, bottom 26. This is the default `layout` in settings.
-- `tools/build-watch.sh` was a workaround for building from a sandbox without terminal
-  access. Not needed when working in Claude Code; can be removed.
 
 ## Status
 

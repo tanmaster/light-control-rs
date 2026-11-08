@@ -188,9 +188,9 @@ pub fn run() {
             }
 
             Event::UserEvent(UserEvent::Menu(id)) => {
-                if &id == open.id() {
+                if id == open.id() {
                     open_picker(&mut app.child, &app.settings, &proxy);
-                } else if &id == on.id() {
+                } else if id == on.id() {
                     app.settings.on = on.is_checked();
                     if !app.settings.on && app.sync.is_some() {
                         screen.set_checked(false);
@@ -201,7 +201,7 @@ pub fn run() {
                     }
                     app.update_icon();
                     app.settings.save();
-                } else if &id == screen.id() {
+                } else if id == screen.id() {
                     app.settings.sync = screen.is_checked();
                     if app.settings.sync {
                         if !app.settings.on {
@@ -214,7 +214,7 @@ pub fn run() {
                         app.stop_sync();
                     }
                     app.settings.save();
-                } else if let Some(pos) = screen_items.iter().position(|(_, item)| &id == item.id()) {
+                } else if let Some(pos) = screen_items.iter().position(|(_, item)| id == item.id()) {
                     // Radio behaviour: exactly one screen is checked.
                     for (i, (_, item)) in screen_items.iter().enumerate() {
                         item.set_checked(i == pos);
@@ -225,7 +225,7 @@ pub fn run() {
                         app.settings.save();
                         app.restart_sync();
                     }
-                } else if let Some(pos) = colour_items.iter().position(|(_, item)| &id == item.id()) {
+                } else if let Some(pos) = colour_items.iter().position(|(_, item)| id == item.id()) {
                     for (i, (_, item)) in colour_items.iter().enumerate() {
                         item.set_checked(i == pos);
                     }
@@ -234,15 +234,15 @@ pub fn run() {
                     app.settings.sync_gamma = tuning.gamma;
                     app.settings.save();
                     app.restart_sync();
-                } else if &id == resend.id() {
+                } else if id == resend.id() {
                     let _ = app.device.send(Command::Resend);
-                } else if &id == login.id() {
+                } else if id == login.id() {
                     let want = login.is_checked();
                     if let Err(e) = autostart::set_enabled(want) {
                         eprintln!("could not change launch at login: {e}");
                         login.set_checked(!want);
                     }
-                } else if &id == quit.id() {
+                } else if id == quit.id() {
                     if let Some(mut c) = app.child.take() {
                         let _ = c.kill();
                     }
