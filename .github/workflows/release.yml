@@ -53,7 +53,7 @@ jobs:
           mkdir -p "dist/$name"
           cp "target/release/${{ matrix.bin }}" README.md LICENSE "dist/$name/"
           if [ "$RUNNER_OS" = "Linux" ]; then
-            cp packaging/linux/99-light-control.rules "dist/$name/"
+            cp packaging/linux/70-light-control.rules "dist/$name/"
           fi
           cd dist
           if [ "$RUNNER_OS" = "Windows" ]; then
@@ -82,7 +82,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp packaging/linux/99-light-control.rules dist/
+          cp packaging/linux/70-light-control.rules dist/
           (cd dist && sha256sum * > SHA256SUMS.txt)
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "light-control $GITHUB_REF_NAME" \

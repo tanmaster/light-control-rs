@@ -45,6 +45,9 @@ Quit any running instance before `--test-layout`, or it overwrites the pattern w
 - **Linux runtime libraries:** the binary must only link libraries a stock Ubuntu desktop ships
   (CI checks this with `readelf`). `tray-icon` is built without its default `libxdo` feature
   for this reason (v0.2.0 failed to start with `libxdo.so.3: cannot open shared object file`).
+- **udev rule number:** `TAG+="uaccess"` only works in a rule file numbered below 73
+  (systemd applies it in `73-seat-late.rules`), hence `70-light-control.rules`.
+  v0.2.0/v0.2.1 shipped `99-…` and gave "Permission denied".
 - Screen capture needs Screen Recording permission on macOS (granted to the terminal when
   run from one). Ubuntu Wayland shows a screen-share prompt.
 - The strip ignores the checksum in practice, but we always send correct ones.

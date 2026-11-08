@@ -50,4 +50,4 @@ jobs:
           name: ${{ matrix.artifact }}
           path: |
             target/release/${{ matrix.bin }}
-            packaging/linux/99-light-control.rules
+            packaging/linux/70-light-control.rules

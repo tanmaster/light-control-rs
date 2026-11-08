@@ -200,7 +200,7 @@ impl Worker {
                 if self.connected != Some(false) {
                     eprintln!("could not open light strip: {e}");
                     #[cfg(target_os = "linux")]
-                    eprintln!("on Linux, install the udev rule from packaging/linux (see README)");
+                    eprintln!("on Linux, install 70-light-control.rules (in the download, see README) and replug the strip");
                 }
                 self.set_connected(false);
             }

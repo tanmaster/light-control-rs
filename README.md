@@ -53,14 +53,15 @@ Static colours need no permission.
 ### Linux (tested on Ubuntu)
 
 Allow your user to talk to the strip (otherwise only root can). The rule is included in the
-Linux download and in [`packaging/linux`](packaging/linux/99-light-control.rules):
+Linux download and in [`packaging/linux`](packaging/linux/70-light-control.rules):
 
 ```sh
-sudo cp 99-light-control.rules /etc/udev/rules.d/
+sudo cp 70-light-control.rules /etc/udev/rules.d/
 sudo udevadm control --reload && sudo udevadm trigger
 ```
 
-Then unplug and replug the strip.
+Then unplug and replug the strip. If you installed `99-light-control.rules` from v0.2.0 or
+v0.2.1, delete it: that name sorts too late for udev to grant access.
 
 The tray icon uses **AppIndicator**. Ubuntu enables it by default; on other GNOME
 distributions install the *AppIndicator and KStatusNotifierItem Support* extension.

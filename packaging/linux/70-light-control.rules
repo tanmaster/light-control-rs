@@ -1,0 +1,4 @@
+# Let the logged-in user talk to the DX-Light / Robobloq light strip without root.
+# The number must be below 73: systemd turns the uaccess tag into an ACL in 73-seat-late.rules.
+# Install: sudo cp 70-light-control.rules /etc/udev/rules.d/ && sudo udevadm control --reload && sudo udevadm trigger
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="fe07", MODE="0660", TAG+="uaccess"
