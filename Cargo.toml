@@ -13,7 +13,8 @@ categories = ["hardware-support", "command-line-utilities", "multimedia"]
 
 [dependencies]
 hidapi = "2.6"
-tray-icon = "0.21"
+# No libxdo: it is only used for Copy/Paste menu items, and Ubuntu does not ship it by default.
+tray-icon = { version = "0.21", default-features = false }
 tao = "0.34"
 eframe = { version = "0.32", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
 directories = "6"

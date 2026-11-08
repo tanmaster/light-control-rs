@@ -31,10 +31,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgtk-3-dev libxdo-dev libayatana-appindicator3-dev libudev-dev libxkbcommon-dev \
+            libgtk-3-dev libayatana-appindicator3-dev libudev-dev libxkbcommon-dev \
             clang libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev
       - run: cargo test --release
       - run: cargo build --release
+      - name: Check Linux runtime libraries
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # Only libraries that a stock Ubuntu desktop ships may be linked directly.
+          allowed='^(libc|libm|libgcc_s|libudev|libxcb|libglib-2\.0|libgobject-2\.0|libgio-2\.0|libgdk-3|libgtk-3|libgdk_pixbuf-2\.0|libcairo)\.so'
+          needed=$(readelf -d target/release/light-control | sed -n 's/.*Shared library: \[\(.*\)\]/\1/p')
+          echo "$needed"
+          bad=$(echo "$needed" | grep -Ev "$allowed" || true)
+          if [ -n "$bad" ]; then echo "::error::unexpected runtime libraries: $bad"; exit 1; fi
       - uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.artifact }}

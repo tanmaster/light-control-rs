@@ -42,6 +42,9 @@ Quit any running instance before `--test-layout`, or it overwrites the pattern w
   `__swift_FORCE_LOAD_$_swiftCompatibility56` or the binary aborts with
   `Library not loaded: @rpath/libswift_Concurrency.dylib`. A dependency's
   `cargo:rustc-link-arg` does not reach our binary, so these must stay in our `build.rs`.
+- **Linux runtime libraries:** the binary must only link libraries a stock Ubuntu desktop ships
+  (CI checks this with `readelf`). `tray-icon` is built without its default `libxdo` feature
+  for this reason (v0.2.0 failed to start with `libxdo.so.3: cannot open shared object file`).
 - Screen capture needs Screen Recording permission on macOS (granted to the terminal when
   run from one). Ubuntu Wayland shows a screen-share prompt.
 - The strip ignores the checksum in practice, but we always send correct ones.
