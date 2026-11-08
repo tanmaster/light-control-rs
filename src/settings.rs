@@ -45,10 +45,14 @@ impl Default for Settings {
     }
 }
 
+/// A file in the app's config directory (next to `settings.json`).
+pub fn config_file(name: &str) -> Option<PathBuf> {
+    ProjectDirs::from("com", "tanmaster", "light-control").map(|d| d.config_dir().join(name))
+}
+
 impl Settings {
     fn path() -> Option<PathBuf> {
-        ProjectDirs::from("com", "tanmaster", "light-control")
-            .map(|d| d.config_dir().join("settings.json"))
+        config_file("settings.json")
     }
 
     pub fn load() -> Self {

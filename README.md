@@ -65,7 +65,10 @@ v0.2.1, delete it: that name sorts too late for udev to grant access.
 
 The tray icon uses **AppIndicator**. Ubuntu enables it by default; on other GNOME
 distributions install the *AppIndicator and KStatusNotifierItem Support* extension.
-On Wayland, the system asks which screen to share when screen sync starts. X11 needs nothing.
+On **Wayland**, the first time you turn on screen sync the system asks which screen to share.
+The choice is remembered, so later starts (and logins) sync without asking again. Picking a
+different screen under *Sync screen* shows the dialog once more. If you decline, screen sync stays
+idle until you turn it off and on again. X11 needs nothing.
 
 ### Windows
 
@@ -168,7 +171,9 @@ real USB captures. Notes on the controller board are in [`docs/hardware.md`](doc
 - `src/protocol.rs`: packet formats
 - `src/device.rs`: background thread that owns the HID device, re-sends the colour when needed, streams sync frames
 - `src/sync.rs`, `src/layout.rs`, `src/color.rs`: screen-sync loop, edge sampling, colour presets
-- `src/capture_mac.rs`: ScreenCaptureKit capture on macOS; Windows and Linux use [`xcap`](https://crates.io/crates/xcap) screenshots
+- `src/capture_mac.rs`: ScreenCaptureKit capture on macOS
+- `src/capture_linux.rs`: screen-cast stream on Linux/Wayland (xdg-desktop-portal + PipeWire);
+  Windows and X11 use [`xcap`](https://crates.io/crates/xcap) screenshots
 - `src/tray.rs`: tray icon and menu
 - `src/picker.rs`: colour picker window, run as a separate short-lived process so the always-running part stays small
 - `src/autostart.rs`: LaunchAgent (macOS), XDG autostart (Linux), `HKCU\…\Run` (Windows)

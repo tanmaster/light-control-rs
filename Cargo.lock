@@ -2163,12 +2163,14 @@ dependencies = [
  "directories",
  "eframe",
  "hidapi",
+ "pipewire",
  "screencapturekit",
  "serde",
  "serde_json",
  "tao",
  "tray-icon",
  "xcap",
+ "zbus",
 ]
 
 [[package]]

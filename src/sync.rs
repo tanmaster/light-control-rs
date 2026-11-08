@@ -2,6 +2,7 @@
 //!
 //! Capture backends:
 //! * macOS: ScreenCaptureKit (`capture_mac.rs`), GPU-scaled tiny frames, only on change.
+//! * Linux on Wayland: portal ScreenCast + PipeWire (`capture_linux.rs`), only on change.
 //! * everywhere else, and as a fallback: full screenshots via `xcap`.
 
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
@@ -87,13 +88,39 @@ fn find_monitor(name: Option<&str>) -> Option<Monitor> {
 enum Source {
     #[cfg(target_os = "macos")]
     Native(crate::capture_mac::MacCapture),
+    #[cfg(target_os = "linux")]
+    PipeWire(crate::capture_linux::LinuxCapture),
     Screenshots(Monitor),
+}
+
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+enum OpenError {
+    /// Try again in a moment (e.g. no monitor yet).
+    Retry(String),
+    /// Don't retry until sync is restarted (e.g. the user declined screen sharing).
+    GiveUp(String),
 }
 
 impl Source {
     /// Open the best available capture method. Returns the source and a label for logging.
-    fn open(screen: Option<&str>) -> Result<(Self, String), String> {
-        let monitor = find_monitor(screen).ok_or("no monitor found")?;
+    fn open(screen: Option<&str>) -> Result<(Self, String), OpenError> {
+        #[cfg(target_os = "linux")]
+        if crate::capture_linux::is_wayland() {
+            use crate::capture_linux::{is_gnome, Error, LinuxCapture};
+            match LinuxCapture::start(screen) {
+                Ok(capture) => return Ok((Self::PipeWire(capture), "screen via PipeWire".into())),
+                Err(Error::Cancelled) => {
+                    return Err(OpenError::GiveUp(
+                        "screen sharing was declined; turn screen sync off and on to be asked again".into(),
+                    ))
+                }
+                // GNOME screenshots flash the screen and block input, so don't fall back there.
+                Err(e) if is_gnome() => return Err(OpenError::Retry(format!("screen capture failed: {e}"))),
+                Err(e) => eprintln!("screen sync: PipeWire capture unavailable ({e}), using screenshots"),
+            }
+        }
+
+        let monitor = find_monitor(screen).ok_or_else(|| OpenError::Retry("no monitor found".into()))?;
         let label = monitor
             .friendly_name()
             .or_else(|_| monitor.name())
@@ -117,6 +144,8 @@ impl Source {
         match self {
             #[cfg(target_os = "macos")]
             Self::Native(capture) => Ok(capture.next_frame()),
+            #[cfg(target_os = "linux")]
+            Self::PipeWire(capture) => capture.next_frame(),
             Self::Screenshots(monitor) => monitor
                 .capture_image()
                 .map(|img| {
@@ -178,13 +207,20 @@ fn run(
                     source = Some(s);
                     label = l;
                 }
-                Err(e) => {
+                Err(OpenError::Retry(e)) => {
                     if !reported_error {
                         eprintln!("screen sync: {e}");
                         reported_error = true;
                     }
                     thread::sleep(Duration::from_secs(1));
                     continue;
+                }
+                Err(OpenError::GiveUp(e)) => {
+                    eprintln!("screen sync: {e}");
+                    while !stop.load(Ordering::Relaxed) {
+                        thread::sleep(Duration::from_millis(200));
+                    }
+                    return;
                 }
             }
         }

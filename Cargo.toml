@@ -26,6 +26,12 @@ xcap = "0.9"
 [target.'cfg(target_os = "macos")'.dependencies]
 screencapturekit = "11.1"
 
+# Screen sync on Wayland: xdg-desktop-portal ScreenCast (D-Bus) + PipeWire stream.
+# Both are already dependencies of xcap; same versions, so nothing extra gets built.
+[target.'cfg(target_os = "linux")'.dependencies]
+pipewire = "0.10"
+zbus = "5"
+
 [profile.release]
 opt-level = "s"
 lto = true

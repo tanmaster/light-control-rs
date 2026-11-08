@@ -30,6 +30,9 @@ Quit any running instance before `--test-layout`, or it overwrites the pattern w
   `RRGGBB <brightness>` lines on stdout (keeps the tray process small, avoids event-loop conflicts)
 - `sync.rs`: screen-sync loop (~30 fps, exponential smoothing, sends only on change)
 - `capture_mac.rs`: macOS ScreenCaptureKit capture, GPU-scaled to 160×90, frames only on change
+- `capture_linux.rs`: Wayland capture via xdg-desktop-portal ScreenCast (zbus, blocking) + PipeWire
+  stream; reads a sparse grid of the full-res SHM frame into 160 px wide frames. Restore token
+  (`persist_mode` 2) stored as `screencast-token` next to `settings.json`, keyed by screen choice
 - `layout.rs`: LED positions around the screen + edge sampling
 - `color.rs`: saturation + gamma enhancement presets (Natural / Vivid / Intense)
 - `settings.rs`: JSON settings in the OS config dir (`directories` crate)
@@ -49,7 +52,10 @@ Quit any running instance before `--test-layout`, or it overwrites the pattern w
   (systemd applies it in `73-seat-late.rules`), hence `70-light-control.rules`.
   v0.2.0/v0.2.1 shipped `99-…` and gave "Permission denied".
 - Screen capture needs Screen Recording permission on macOS (granted to the terminal when
-  run from one). Ubuntu Wayland shows a screen-share prompt.
+  run from one). Ubuntu Wayland shows a screen-share prompt (once, thanks to the restore token).
+- **Never use xcap screenshots on GNOME Wayland:** they go through `org.gnome.Shell.Screenshot`,
+  ~530 ms per frame, flash the screen white and block input. `sync.rs` uses PipeWire there and
+  does not fall back to screenshots.
 - The strip ignores the checksum in practice, but we always send correct ones.
 - LED order (verified): LED 1 at the bottom of the left edge, clockwise: left 14, top 26,
   right 14, bottom 26. This is the default `layout` in settings.
@@ -62,9 +68,10 @@ Working and verified on macOS: static colour, picker, replug/wake recovery, auto
 screen sync with monitor choice, ScreenCaptureKit capture (~1% CPU on a still screen),
 colour presets. Release binary ~3.8 MB.
 
-**Windows and Linux** build and pass tests in CI (`.github/workflows/build.yml`), but have not
-been run on real hardware yet. They use `xcap` screenshots for capture (no native low-cost
-capture yet). Linux needs `libpipewire-0.3-dev`, `libgbm-dev` and friends; the full apt list
+**Windows and Linux** build and pass tests in CI (`.github/workflows/build.yml`).
+Windows: works on real hardware; screen sync uses `xcap` screenshots and is a bit laggy.
+Linux: tray, picker and udev rule work on Ubuntu. Wayland PipeWire capture is new and needs testing on
+real hardware; X11 uses `xcap` screenshots. Linux needs `libpipewire-0.3-dev`, `libgbm-dev` and friends; the full apt list
 is in the workflow and README.
 
 ## Releasing
@@ -76,12 +83,13 @@ The release workflow has not been run yet.
 
 ## Open tasks
 
-1. Test the Windows and Linux binaries on real hardware (tray, picker, udev rule, screen sync).
-2. Cut the first release (`v0.2.0`) and check the release assets.
+1. Test Wayland screen sync (PipeWire) on Ubuntu: first-run dialog, no dialog on restart,
+   switching screens, declining, stopping sharing from the top bar.
+2. Release the udev rename and the PipeWire capture (v0.2.2).
 
 ## Deferred / parked
 
-- Native capture on Windows (Windows Graphics Capture) and Linux (PipeWire / X11 edge strips).
+- Native capture on Windows (Windows Graphics Capture) and X11 (edge strips via xcb).
 - Custom firmware for the controller: parked by the owner. Findings in `docs/hardware.md`.
   The original firmware is read-protected and cannot be backed up, so flashing would be
   one-way. **Do not flash anything without explicit approval.**

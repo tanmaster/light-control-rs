@@ -2,6 +2,8 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod autostart;
+#[cfg(target_os = "linux")]
+mod capture_linux;
 #[cfg(target_os = "macos")]
 mod capture_mac;
 mod color;
